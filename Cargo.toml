@@ -15,3 +15,16 @@ categories = ["filesystem", "network-programming"]
 tokio = { version = "1.0", features = ["full"] }
 libp2p = { version = "0.55.0", features = ["tcp", "noise", "yamux", "identify", "ping"] }
 clap = { version = "4.5.40", features = ["derive"] }
+
+# Configuration and serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+uuid = { version = "1.17.0", features = ["v4"] }
+
+[dev-dependencies]
+# Testing utilities
+tempfile = "3.0"
+tokio-test = "0.4"
+assert_cmd = "2.0"  # For CLI testing
+predicates = "3.0"  # For output assertions
