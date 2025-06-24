@@ -1,5 +1,5 @@
 use uuid::Uuid;
-use crate::config::NodeState;
+use crate::config::{NodeState, LogLevel};
 
 pub struct Node {
     pub id: Uuid,               // Generated or loaded from storage
@@ -7,12 +7,12 @@ pub struct Node {
     pub address: String,        // Node's network address
     pub port: u16,              // Listening port
     pub storage_dir: String,    // Directory for storing data
-    pub log_level: String,      // Logging level (error, warn, info, debug, trace)
+    pub log_level: LogLevel,    // Logging level (using enum)
     pub daemon_mode: bool,      // Whether to run as a daemon
 }
 
 impl Node {
-    pub fn new(address: String, port: u16, storage_dir: String, log_level: String, daemon_mode: bool) -> Node {
+    pub fn new(address: String, port: u16, storage_dir: String, log_level: LogLevel, daemon_mode: bool) -> Node {
         Node {
             id: Uuid::new_v4(),
             state: NodeState::Stopped,  // Start as stopped, will change to Starting/Running
@@ -42,5 +42,52 @@ impl Node {
     
     pub fn get_status(&self) -> &NodeState {
         &self.state
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_node_creation() {
+        let node = Node::new(
+            "127.0.0.1".to_string(),
+            4001,
+            "/tmp/test".to_string(),
+            LogLevel::Info,
+            false
+        );
+        
+        assert_eq!(node.address, "127.0.0.1");
+        assert_eq!(node.port, 4001);
+        assert_eq!(node.storage_dir, "/tmp/test");
+        assert!(!node.daemon_mode);
+        assert_eq!(*node.get_status(), NodeState::Stopped);
+    }
+
+    #[test]
+    fn test_node_state_transitions() {
+        let mut node = Node::new(
+            "127.0.0.1".to_string(),
+            4001,
+            "/tmp/test".to_string(),
+            LogLevel::Info,
+            false
+        );
+        
+        // Initial state should be Stopped
+        assert_eq!(*node.get_status(), NodeState::Stopped);
+        assert!(!node.is_running());
+        
+        // Start the node
+        node.start();
+        assert_eq!(*node.get_status(), NodeState::Running);
+        assert!(node.is_running());
+        
+        // Stop the node
+        node.stop();
+        assert_eq!(*node.get_status(), NodeState::Stopped);
+        assert!(!node.is_running());
     }
 }

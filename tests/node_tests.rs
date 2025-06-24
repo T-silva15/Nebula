@@ -1,4 +1,4 @@
-use nebula::{node::Node, config::NodeState};
+use nebula::{node::Node, config::{NodeState, LogLevel}};
 
 #[test]
 fn test_node_creation() {
@@ -6,7 +6,7 @@ fn test_node_creation() {
         "127.0.0.1".to_string(),
         4001,
         "/tmp/test".to_string(),
-        "info".to_string(),
+        LogLevel::Info,
         false
     );
     
@@ -23,7 +23,7 @@ fn test_node_state_transitions() {
         "127.0.0.1".to_string(),
         4001,
         "/tmp/test".to_string(),
-        "info".to_string(),
+        LogLevel::Info,
         false
     );
     

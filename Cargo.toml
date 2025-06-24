@@ -1,7 +1,7 @@
 [package]
 name = "nebula"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 description = "A peer-to-peer distributed file system with content-addressable storage and DHT"
 authors = ["Tiago Silva"]
 license = "MIT"
@@ -9,6 +9,14 @@ repository = "https://github.com/T-silva15/Nebula"
 readme = "README.md"
 keywords = ["distributed", "p2p", "file-system", "content-addressable", "dht"]
 categories = ["filesystem", "network-programming"]
+
+[[bin]]
+name = "nebula"
+path = "src/main.rs"
+
+[lib]
+name = "nebula"
+path = "src/lib.rs"
 
 [dependencies]
 # Phase 1: Basic node setup and networking

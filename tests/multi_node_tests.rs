@@ -18,7 +18,7 @@ impl MultiNodeTest {
             let config = Config {
                 listen_port: 4000 + i as u16, // Different ports for each node
                 listen_address: "127.0.0.1".to_string(),
-                storage_dir: tempfile::tempdir().unwrap().into_path(),
+                storage_dir: tempfile::tempdir().unwrap().path().to_path_buf(),
                 log_level: nebula::config::LogLevel::Error, // Quiet during tests
                 daemon_mode: false,
                 verbose: false,
@@ -28,7 +28,7 @@ impl MultiNodeTest {
                 config.listen_address.clone(),
                 config.listen_port,
                 config.storage_dir.to_string_lossy().to_string(),
-                config.log_level.to_string(),
+                config.log_level,
                 config.daemon_mode,
             );
             

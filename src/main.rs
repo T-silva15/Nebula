@@ -44,7 +44,7 @@ fn handle_cli(args: &NebulaArgs, config: &Config) {
                 config.listen_address.clone(),
                 config.listen_port,
                 config.storage_dir.to_string_lossy().to_string(),
-                config.log_level.to_string(),
+                config.log_level,
                 config.daemon_mode
             );
 
