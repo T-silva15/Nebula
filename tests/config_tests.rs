@@ -1,5 +1,4 @@
 use nebula::config::{Config, LogLevel};
-use std::path::PathBuf;
 
 #[test]
 fn test_config_default() {

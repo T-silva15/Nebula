@@ -7,4 +7,4 @@ pub mod builders;
 // Re-export public items for easier access
 pub use enums::{LogLevel, NodeState};
 pub use config::Config;
-pub use builders::*;
+// Builder methods are directly implemented on Config struct
