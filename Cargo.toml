@@ -11,4 +11,7 @@ keywords = ["distributed", "p2p", "file-system", "content-addressable", "dht"]
 categories = ["filesystem", "network-programming"]
 
 [dependencies]
-# Will add dependencies as we implement features
+# Phase 1: Basic node setup and networking
+tokio = { version = "1.0", features = ["full"] }
+libp2p = { version = "0.55.0", features = ["tcp", "noise", "yamux", "identify", "ping"] }
+clap = { version = "4.5.40", features = ["derive"] }
