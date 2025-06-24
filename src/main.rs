@@ -48,7 +48,8 @@ fn handle_cli(args: &NebulaArgs, config: &Config) {
                 config.daemon_mode
             );
 
-            config.save_to_file(&config.storage_dir).expect("Failed to save config");
+            let config_file_path = config.storage_dir.join("config.json");
+            config.save_to_file(&config_file_path).expect("Failed to save config");
             println!("Node created with ID: {}", node.id);
             // TODO: Actually start the node
         },
