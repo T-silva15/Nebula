@@ -40,7 +40,7 @@ fn handle_cli(args: &NebulaArgs, config: &Config) {
             }
             
             // Create and start the node
-            let node = Node::new(
+            let mut node = Node::new(
                 config.listen_address.clone(),
                 config.listen_port,
                 config.storage_dir.to_string_lossy().to_string(),
@@ -51,6 +51,13 @@ fn handle_cli(args: &NebulaArgs, config: &Config) {
             let config_file_path = config.storage_dir.join("config.json");
             config.save_to_file(&config_file_path).expect("Failed to save config");
             println!("Node created with ID: {}", node.id);
+            node.start();
+            print!("Node started with ID: {}", node.id);
+            node.is_running(); // Check if the node is running
+            println!("Node status: {:?}", node.get_status());
+            node.stop(); // Stop the node after starting for demonstration
+            println!("Node stopped successfully.");
+
             // TODO: Actually start the node
         },
         Commands::Status { storage } => {

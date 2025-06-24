@@ -56,12 +56,7 @@ impl Config {
     
     /// Save configuration to a JSON file
     pub fn save_to_file(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        // Create parent directories if they don't exist
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
-        }
+        self.ensure_storage_dir()?;
         
         let content = serde_json::to_string_pretty(self)?;
         fs::write(path, content)?;

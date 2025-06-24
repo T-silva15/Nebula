@@ -3,7 +3,7 @@ use crate::config::{NodeState, LogLevel};
 
 pub struct Node {
     pub id: Uuid,               // Generated or loaded from storage
-    pub state: NodeState,       // Node state (using enum)
+    pub state: NodeState,       // Node state (enum)
     pub address: String,        // Node's network address
     pub port: u16,              // Listening port
     pub storage_dir: String,    // Directory for storing data
@@ -15,12 +15,12 @@ impl Node {
     pub fn new(address: String, port: u16, storage_dir: String, log_level: LogLevel, daemon_mode: bool) -> Node {
         Node {
             id: Uuid::new_v4(),
-            state: NodeState::Stopped,  // Start as stopped, will change to Starting/Running
-            address,
-            port,
-            storage_dir,
-            log_level,
-            daemon_mode,
+            state: NodeState::Stopped,
+            address: address,
+            port: port,
+            storage_dir: storage_dir,
+            log_level: log_level,
+            daemon_mode: daemon_mode,
         }
     }
 
