@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 /// Log level enumeration
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum LogLevel {
