@@ -22,12 +22,13 @@ Nebula is an ambitious distributed file system project implemented in Rust that 
 This project is currently in early development. Features are being implemented incrementally:
 
 - [x] Project structure and planning
-- [ ] Local node implementation
-- [ ] Content-addressable storage
-- [ ] File chunking and processing
+- [x] Local node implementation
+- [x] Content-addressable storage
+- [x] File chunking and processing
 - [ ] Peer-to-peer networking
 - [ ] Distributed hash table
-- [ ] Advanced features (deduplication, replication)
+- [x] Basic deduplication
+- [ ] Advanced features (encryption, replication across nodes)
 
 ## 🛠️ Technology Stack
 
