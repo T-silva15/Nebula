@@ -31,9 +31,9 @@ pub enum Commands {
         #[arg(short, long, default_value = "4001")]
         port: u16,
         
-        /// Directory to store node data
-        #[arg(short, long, default_value = "~/.nebula")]
-        storage: PathBuf,
+        /// Directory to store node data (defaults to platform-specific data directory)
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
         
         /// Bind address for the node
         #[arg(short, long, default_value = "0.0.0.0")]
@@ -44,18 +44,66 @@ pub enum Commands {
         daemon: bool,
     },
     
+    /// Store a file in the distributed file system
+    Put {
+        /// File path to store
+        file: PathBuf,
+        /// Optional custom storage location
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+        /// Output format (id, short, json)
+        #[arg(long, default_value = "id")]
+        format: String,
+    },
+    
+    /// Retrieve a file from the distributed file system
+    Get {
+        /// File ID to retrieve
+        file_id: String,
+        /// Output file path
+        #[arg(short, long)]
+        output: PathBuf,
+        /// Optional custom storage location
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+    },
+    
+    /// List stored content
+    List {
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+        /// Show detailed information
+        #[arg(long)]
+        verbose: bool,
+    },
+    
+    /// List registered files
+    ListFiles {
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+        /// Show detailed information
+        #[arg(long)]
+        verbose: bool,
+    },
+    
+    /// Show storage statistics
+    Stats {
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+    },
+    
     /// Show node status and information
     Status {
-        /// Storage directory to check
-        #[arg(short, long, default_value = "~/.nebula")]
-        storage: PathBuf,
+        /// Storage directory to check (defaults to platform-specific data directory)
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
     },
     
     /// Display or modify configuration
     Config {
-        /// Storage directory
-        #[arg(short, long, default_value = "~/.nebula")]
-        storage: PathBuf,
+        /// Storage directory (defaults to platform-specific data directory)
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
         
         /// Show current configuration
         #[arg(long)]
@@ -64,8 +112,8 @@ pub enum Commands {
     
     /// Stop a running node
     Stop {
-        /// Storage directory of the node to stop
-        #[arg(short, long, default_value = "~/.nebula")]
-        storage: PathBuf,
+        /// Storage directory of the node to stop (defaults to platform-specific data directory)
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
     },
 }

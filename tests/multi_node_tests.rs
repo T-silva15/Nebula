@@ -27,10 +27,9 @@ impl MultiNodeTest {
             let node = Node::new(
                 config.listen_address.clone(),
                 config.listen_port,
-                config.storage_dir.to_string_lossy().to_string(),
                 config.log_level,
                 config.daemon_mode,
-            );
+            ).expect("Failed to create node");
             
             nodes.push(Arc::new(Mutex::new(node)));
             configs.push(config);
@@ -43,7 +42,7 @@ impl MultiNodeTest {
     pub async fn start_all(&self) {
         for node in &self.nodes {
             let mut node = node.lock().await;
-            node.start();
+            node.start().expect("Failed to start node");
         }
     }
     
@@ -51,7 +50,7 @@ impl MultiNodeTest {
     pub async fn stop_all(&self) {
         for node in &self.nodes {
             let mut node = node.lock().await;
-            node.stop();
+            node.stop().expect("Failed to stop node");
         }
     }
     

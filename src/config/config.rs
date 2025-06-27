@@ -22,10 +22,15 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Config {
+        // Get a proper default directory (cross-platform)
+        let default_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("nebula");
+            
         Config {
             listen_port: 4001,
             listen_address: "0.0.0.0".to_string(),
-            storage_dir: PathBuf::from("~/.nebula"),
+            storage_dir: default_dir,
             log_level: LogLevel::default(),
             daemon_mode: false,
             verbose: false,
@@ -34,6 +39,14 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Create storage directory if it doesn't exist
+    pub fn ensure_storage_dir(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if !self.storage_dir.exists() {
+            fs::create_dir_all(&self.storage_dir)?;
+        }
+        Ok(())
+    }
+    
     /// Load configuration from a JSON file
     pub fn load_from_file(path: &Path) -> Result<Config, Box<dyn std::error::Error>> {
         let content = fs::read_to_string(path)?;
@@ -43,12 +56,7 @@ impl Config {
     
     /// Save configuration to a JSON file
     pub fn save_to_file(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        // Create parent directories if they don't exist
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
-        }
+        self.ensure_storage_dir()?;
         
         let content = serde_json::to_string_pretty(self)?;
         fs::write(path, content)?;
@@ -98,5 +106,22 @@ mod tests {
         let loaded_config = Config::load_from_file(&temp_path).expect("Failed to load config");
         assert_eq!(config.listen_port, loaded_config.listen_port);
         assert_eq!(config.listen_address, loaded_config.listen_address);
+    }
+    
+    #[test]
+    fn test_storage_directory_creation() {
+        let mut config = Config::default();
+        // Use a temporary directory for testing
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        config.storage_dir = temp_dir.path().join("test_storage");
+        
+        // Directory shouldn't exist initially
+        assert!(!config.storage_dir.exists());
+        
+        // Ensure storage directory creation
+        config.ensure_storage_dir().expect("Failed to create storage directory");
+        
+        // Directory should now exist
+        assert!(config.storage_dir.exists());
     }
 }

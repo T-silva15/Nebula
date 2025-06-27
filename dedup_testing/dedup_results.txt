@@ -1,0 +1,24 @@
+=== Deduplication Test Results ===
+Timestamp: Fri Jun 27 10:30:46 AM WEST 2025
+-----------------------------------
+Profile: low
+Files stored: 301
+Total file size: 6903646 bytes
+Unique chunk storage: 4319918 bytes
+Total chunks: 549
+Deduplication savings: 38.00 %
+-----------------------------------
+Profile: medium
+Files stored: 301
+Total file size: 10455101 bytes
+Unique chunk storage: 3551455 bytes
+Total chunks: 475
+Deduplication savings: 67.00 %
+-----------------------------------
+Profile: high
+Files stored: 301
+Total file size: 13038829 bytes
+Unique chunk storage: 2583728 bytes
+Total chunks: 382
+Deduplication savings: 81.00 %
+-----------------------------------

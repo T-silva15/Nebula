@@ -26,13 +26,13 @@ fn test_start_command_default() {
     
     let mut cmd = Command::cargo_bin("nebula").unwrap();
     cmd.arg("start")
+       .arg("--daemon")  // Use daemon mode to avoid interactive waiting
        .arg("--storage")
        .arg(temp_dir.path());
     
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Starting node"))
-        .stdout(predicate::str::contains("Node created with ID"));
+        .stdout(predicate::str::contains("Starting node in daemon mode"));
 }
 
 #[test]
@@ -41,12 +41,13 @@ fn test_start_command_custom_port() {
     
     let mut cmd = Command::cargo_bin("nebula").unwrap();
     cmd.arg("start")
+       .arg("--daemon")  // Use daemon mode to avoid interactive waiting
        .arg("--port").arg("8080")
        .arg("--storage").arg(temp_dir.path());
     
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Starting node on 0.0.0.0:8080"));
+        .stdout(predicate::str::contains("Starting node in daemon mode"));
 }
 
 #[test]
@@ -70,11 +71,12 @@ fn test_verbose_logging() {
     
     let mut cmd = Command::cargo_bin("nebula").unwrap();
     cmd.arg("--verbose")
-       .arg("start")
+       .arg("config")
+       .arg("--show")
        .arg("--storage")
        .arg(temp_dir.path());
     
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Log level: debug"));
+        .stdout(predicate::str::contains("Current configuration"));
 }

@@ -20,15 +20,24 @@ impl Config {
         match &args.command {
             crate::args::Commands::Start { port, storage, address, daemon } => {
                 self.listen_port = *port;
-                self.storage_dir = storage.clone();
+                if let Some(storage_path) = storage {
+                    self.storage_dir = storage_path.clone();
+                }
                 self.listen_address = address.clone();
                 self.daemon_mode = *daemon;
             },
-            // For other commands, we might only use storage_dir
+            // For commands that specify storage directory
+            crate::args::Commands::Put { storage, .. } |
+            crate::args::Commands::Get { storage, .. } |
+            crate::args::Commands::List { storage, .. } |
+            crate::args::Commands::ListFiles { storage, .. } |
+            crate::args::Commands::Stats { storage } |
             crate::args::Commands::Status { storage } |
             crate::args::Commands::Config { storage, .. } |
             crate::args::Commands::Stop { storage } => {
-                self.storage_dir = storage.clone();
+                if let Some(storage_path) = storage {
+                    self.storage_dir = storage_path.clone();
+                }
             },
         }
         

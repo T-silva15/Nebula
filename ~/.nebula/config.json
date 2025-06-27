@@ -1,8 +1,0 @@
-{
-  "listen_port": 8080,
-  "listen_address": "127.0.0.1",
-  "storage_dir": "~/.nebula",
-  "log_level": "Info",
-  "daemon_mode": false,
-  "verbose": false
-}

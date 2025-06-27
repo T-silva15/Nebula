@@ -19,16 +19,21 @@ name = "nebula"
 path = "src/lib.rs"
 
 [dependencies]
-# Phase 1: Basic node setup and networking
-tokio = { version = "1.0", features = ["full"] }
-libp2p = { version = "0.55.0", features = ["tcp", "noise", "yamux", "identify", "ping"] }
-clap = { version = "4.5.40", features = ["derive"] }
+# ---------------------- Phase 1: Basic node setup
+clap = { version = "4.5.40", features = ["derive"] }            # Command line argument parsing
+serde = { version = "1.0", features = ["derive"] }              # Serialization 
+serde_json = "1.0"                                              # Json Serialization
+dirs = "6.0.0"                                                  # Directory traversal
+uuid = { version = "1.17.0", features = ["v4", "serde"] }       # Global uuid generation
 
-# Configuration and serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# ---------------------- Phase 2: Content-addressable storage
+sha2 = "0.10"           # SHA-256 hashing
+blake3 = "1.5"          # Fast hashing alternative
+hex = "0.4"             # Hex encoding/decoding
+bytes = "1.5"           # Efficient byte handling
+thiserror = "2.0.12"    # Error handling
+fastcdc = "3.2.1"       # Content-Defined-Chunking approach
 
-uuid = { version = "1.17.0", features = ["v4"] }
 
 [dev-dependencies]
 # Testing utilities
@@ -36,3 +41,7 @@ tempfile = "3.0"
 tokio-test = "0.4"
 assert_cmd = "2.0"  # For CLI testing
 predicates = "3.0"  # For output assertions
+
+
+tokio = { version = "1.0", features = ["full"] }
+libp2p = { version = "0.55.0", features = ["tcp", "noise", "yamux", "identify", "ping"] }
