@@ -16,8 +16,6 @@ pub struct ChunkConfig {
     pub max_size: usize,
 
     pub use_content_defined: bool,  
-
-    pub normalization: bool, // FastCDC normalization      
 }
 
 impl Default for ChunkConfig {
@@ -27,7 +25,6 @@ impl Default for ChunkConfig {
             target_size: 16 * 1024,     // 16 KB
             max_size: 24 * 1024,       // 24 KB
             use_content_defined: true,  // Enable CDC by default
-            normalization: true,        // FastCDC normalization
         }
     }
 }
@@ -176,7 +173,6 @@ mod tests {
             target_size: 200,
             max_size: 300,
             use_content_defined: false,
-            normalization: true,
         };
         let chunker = Chunker::with_config(config.clone());
         
@@ -190,7 +186,6 @@ mod tests {
             target_size: 8192, // 8KB
             max_size: 16384,   // 16KB
             use_content_defined: true,
-            normalization: true,
         });
         
         let data = vec![42u8; 32768]; // 32KB of identical data
@@ -216,7 +211,6 @@ mod tests {
             target_size: 8192,
             max_size: 16384,
             use_content_defined: false,
-            normalization: true,
         });
         
         let cdc_chunker = Chunker::with_config(ChunkConfig {
@@ -224,7 +218,6 @@ mod tests {
             target_size: 8192,
             max_size: 16384,
             use_content_defined: true,
-            normalization: true,
         });
         
         let fixed_chunks = fixed_chunker.chunk_data(&data);
@@ -259,7 +252,6 @@ mod tests {
             target_size: 50,  // Small for testing
             max_size: 100,
             use_content_defined: false,  // Use fixed-size for predictable testing
-            normalization: true,
         });
         
         let large_data = vec![42u8; 150]; // 150 bytes
