@@ -12,10 +12,9 @@ Nebula is an ambitious distributed file system project implemented in Rust that 
 
 - **Content-Addressable Storage**: Files identified by their content hash rather than location
 - **Peer-to-Peer Architecture**: Decentralized node network with no single point of failure
-- **File Chunking**: Breaking large files into manageable pieces for efficient distribution
+- **File Chunking**: Breaking large files into manageable pieces for efficient distribution, using variable sized chunking
 - **Distributed Hash Tables**: Kademlia-based DHT for efficient content routing
 - **Data Deduplication**: Automatic detection and elimination of redundant data
-- **Merkle Trees**: Cryptographic verification of file integrity
 
 ## 🚧 Project Status
 
@@ -35,6 +34,7 @@ This project is currently in early development. Features are being implemented i
 - **Rust**: For performance, memory safety, and concurrency
 - **Tokio**: Asynchronous runtime
 - **libp2p**: Peer-to-peer networking framework
+- **fastCDC**: Variable sized chunking
 - **BLAKE3**: High-performance cryptographic hashing
 - **Clap**: Command line argument parsing
 
