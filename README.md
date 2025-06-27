@@ -28,7 +28,7 @@ Nebula is an ambitious distributed file system project implemented in Rust that 
 
 **Phase 2: Content-Addressable Storage** ✅  
 - [x] SHA-256 based content addressing
-- [x] FastCDC variable-sized chunking (8-24KB)
+- [x] FastCDC variable-sized chunking (4-16KB)
 - [x] File registry system with UUID-based file management
 - [x] Exceptional deduplication (38-81% storage savings)
 - [x] Comprehensive testing framework
