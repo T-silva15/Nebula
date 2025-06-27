@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
 use std::fmt;
+use std::str::FromStr;
 
 /// Hash algorithm used for content addressing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -102,6 +103,14 @@ impl ContentAddress {
 impl fmt::Display for ContentAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_hex())
+    }
+}
+
+impl FromStr for ContentAddress {
+    type Err = ContentAddressError;
+    
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_hex(s)
     }
 }
 

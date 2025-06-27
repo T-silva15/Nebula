@@ -26,7 +26,12 @@ impl Config {
                 self.listen_address = address.clone();
                 self.daemon_mode = *daemon;
             },
-            // For other commands, we might only use storage_dir
+            // For commands that specify storage directory
+            crate::args::Commands::Put { storage, .. } |
+            crate::args::Commands::Get { storage, .. } |
+            crate::args::Commands::List { storage, .. } |
+            crate::args::Commands::ListFiles { storage, .. } |
+            crate::args::Commands::Stats { storage } |
             crate::args::Commands::Status { storage } |
             crate::args::Commands::Config { storage, .. } |
             crate::args::Commands::Stop { storage } => {

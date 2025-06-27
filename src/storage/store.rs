@@ -63,8 +63,14 @@ pub struct ContentStoreConfig {
 
 impl Default for ContentStoreConfig {
     fn default() -> Self {
+        // Use user's home directory, fallback to current directory if home not available
+        let default_path = dirs::home_dir()
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+            .join(".nebula")
+            .join("store");
+            
         Self {
-            storage_path: PathBuf::from(".nebula/store"),
+            storage_path: default_path,
             chunk_config: ChunkConfig::default(),
             verify_on_read: true,
         }
@@ -245,6 +251,101 @@ impl ContentStore {
         
         self.objects_dir.join(subdir).join(filename)
     }
+    
+    /// List all stored chunks with detailed information
+    pub fn list_content(&self) -> Result<ContentListing> {
+        let mut chunks = Vec::new();
+        let mut total_chunks = 0;
+        let mut total_size = 0;
+        
+        fn enumerate_chunks(dir: &Path, chunks: &mut Vec<ChunkInfo>, total_chunks: &mut usize, total_size: &mut u64) -> io::Result<()> {
+            for entry in fs::read_dir(dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                
+                if path.is_dir() {
+                    enumerate_chunks(&path, chunks, total_chunks, total_size)?;
+                } else {
+                    let metadata = entry.metadata()?;
+                    *total_chunks += 1;
+                    *total_size += metadata.len();
+                    
+                    // Reconstruct the content address from the file path
+                    if let Some(parent) = path.parent() {
+                        if let (Some(subdir), Some(filename)) = (parent.file_name(), path.file_name()) {
+                            let subdir_str = subdir.to_string_lossy();
+                            let filename_str = filename.to_string_lossy();
+                            let hash_str = format!("{}{}", subdir_str, filename_str);
+                            
+                            // Try to parse as content address
+                            if let Ok(address) = hash_str.parse::<ContentAddress>() {
+                                chunks.push(ChunkInfo {
+                                    address,
+                                    size: metadata.len(),
+                                    created_at: metadata.created().unwrap_or(std::time::UNIX_EPOCH),
+                                    file_path: path.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        
+        enumerate_chunks(&self.objects_dir, &mut chunks, &mut total_chunks, &mut total_size)?;
+        
+        // Sort chunks by creation time (newest first)
+        chunks.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        
+        let stats = ContentStoreStats {
+            total_chunks,
+            total_size,
+            storage_path: self.config.storage_path.clone(),
+        };
+        
+        Ok(ContentListing { chunks, stats })
+    }
+}
+
+/// Information about a stored chunk
+#[derive(Debug, Clone)]
+pub struct ChunkInfo {
+    pub address: ContentAddress,
+    pub size: u64,
+    pub created_at: std::time::SystemTime,
+    pub file_path: PathBuf,
+}
+
+impl ChunkInfo {
+    /// Format the address for display (shortened)
+    pub fn short_address(&self) -> String {
+        let addr_str = self.address.to_string();
+        if addr_str.len() > 16 {
+            format!("{}...{}", &addr_str[0..8], &addr_str[addr_str.len()-8..])
+        } else {
+            addr_str
+        }
+    }
+    
+    /// Format the creation time
+    pub fn created_time_string(&self) -> String {
+        match std::time::SystemTime::now().duration_since(self.created_at) {
+            Ok(duration) => {
+                let secs = duration.as_secs();
+                if secs < 60 {
+                    format!("{} seconds ago", secs)
+                } else if secs < 3600 {
+                    format!("{} minutes ago", secs / 60)
+                } else if secs < 86400 {
+                    format!("{} hours ago", secs / 3600)
+                } else {
+                    format!("{} days ago", secs / 86400)
+                }
+            }
+            Err(_) => "just now".to_string()
+        }
+    }
 }
 
 /// Statistics about the content store
@@ -253,6 +354,13 @@ pub struct ContentStoreStats {
     pub total_chunks: usize,
     pub total_size: u64,
     pub storage_path: PathBuf,
+}
+
+/// Detailed information about stored content
+#[derive(Debug, Clone)]
+pub struct ContentListing {
+    pub chunks: Vec<ChunkInfo>,
+    pub stats: ContentStoreStats,
 }
 
 #[cfg(test)]

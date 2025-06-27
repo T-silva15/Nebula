@@ -44,6 +44,54 @@ pub enum Commands {
         daemon: bool,
     },
     
+    /// Store a file in the distributed file system
+    Put {
+        /// File path to store
+        file: PathBuf,
+        /// Optional custom storage location
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+        /// Output format (id, short, json)
+        #[arg(long, default_value = "id")]
+        format: String,
+    },
+    
+    /// Retrieve a file from the distributed file system
+    Get {
+        /// File ID to retrieve
+        file_id: String,
+        /// Output file path
+        #[arg(short, long)]
+        output: PathBuf,
+        /// Optional custom storage location
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+    },
+    
+    /// List stored content
+    List {
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+        /// Show detailed information
+        #[arg(long)]
+        verbose: bool,
+    },
+    
+    /// List registered files
+    ListFiles {
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+        /// Show detailed information
+        #[arg(long)]
+        verbose: bool,
+    },
+    
+    /// Show storage statistics
+    Stats {
+        #[arg(short, long)]
+        storage: Option<PathBuf>,
+    },
+    
     /// Show node status and information
     Status {
         /// Storage directory to check (defaults to platform-specific data directory)
