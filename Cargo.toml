@@ -34,6 +34,11 @@ bytes = "1.5"           # Efficient byte handling
 thiserror = "2.0.12"    # Error handling
 fastcdc = "3.2.1"       # Content-Defined-Chunking approach
 
+# ---------------------- Phase 3: P2P Networking
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+libp2p = { version = "0.55.0", features = ["tcp", "tokio", "noise", "yamux", "identify", "ping", "macros"] }
+
 
 [dev-dependencies]
 # Testing utilities
@@ -41,7 +46,3 @@ tempfile = "3.0"
 tokio-test = "0.4"
 assert_cmd = "2.0"  # For CLI testing
 predicates = "3.0"  # For output assertions
-
-
-tokio = { version = "1.0", features = ["full"] }
-libp2p = { version = "0.55.0", features = ["tcp", "noise", "yamux", "identify", "ping"] }
