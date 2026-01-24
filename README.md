@@ -1,201 +1,131 @@
-# 🌌 Nebula - Distributed File System
+# 🌌 Nebula
 
-A peer-to-peer distributed file system built in Rust featuring content-addressable storage, file chunking, deduplication, and distributed hash tables.
+A peer-to-peer distributed file system built in Rust.
 
 ![Rust](https://img.shields.io/badge/Rust-1.76+-orange.svg)
-![Status](https://img.shields.io/badge/Status-In_Development-yellow.svg)
+![Status](https://img.shields.io/badge/Status-Complete-green.svg)
+![Tests](https://img.shields.io/badge/Tests-72_passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-## 📋 Overview
+## Features
 
-Nebula is an ambitious distributed file system project implemented in Rust that demonstrates advanced distributed systems concepts including:
+- **Content-Addressable Storage** - Files identified by SHA-256 hash
+- **P2P Networking** - libp2p with mDNS discovery and TCP transport
+- **Distributed Hash Table** - S/Kademlia (k=20, α=3) for content routing
+- **Content-Defined Chunking** - FastCDC for efficient deduplication
+- **Automatic Deduplication** - 38-81% storage savings
 
-- **Content-Addressable Storage**: Files identified by their content hash rather than location
-- **Peer-to-Peer Architecture**: Decentralized node network with no single point of failure
-- **File Chunking**: Breaking large files into manageable pieces for efficient distribution
-- **Distributed Hash Tables**: Kademlia-based DHT for efficient content routing
-- **Data Deduplication**: Automatic detection and elimination of redundant data
-- **Content Integrity**: SHA-256 based content addressing for cryptographic verification
+## Quick Start
 
-## 🚧 Project Status & Roadmap
-
-### ✅ Completed Phases
-
-**Phase 1: Foundation & Architecture** ✅
-- [x] Project structure and core architecture
-- [x] Local node implementation with persistent storage
-- [x] CLI interface and configuration system
-
-**Phase 2: Content-Addressable Storage** ✅  
-- [x] SHA-256 based content addressing
-- [x] FastCDC variable-sized chunking (4-16KB)
-- [x] File registry system with UUID-based file management
-- [x] Exceptional deduplication (38-81% storage savings)
-- [x] Comprehensive testing framework
-
-### 🚧 Upcoming Phases
-
-**Phase 3: Peer-to-Peer Networking** (Next)
-- [ ] libp2p integration for node communication
-- [ ] Peer discovery and connection management
-- [ ] Basic chunk request/response protocol
-- [ ] Secure peer authentication and encryption
-- [ ] Multi-node chunk transfer and retrieval
-
-**Phase 4: Distributed Hash Table**
-- [ ] Kademlia DHT implementation
-- [ ] Distributed content location and routing
-- [ ] Node join/leave handling
-- [ ] DHT-based peer discovery
-- [ ] Network partitioning resilience
-
-**Phase 5: Advanced Distributed Features**
-- [ ] Cross-network deduplication optimization
-- [ ] Intelligent chunk replication strategies
-- [ ] Load balancing and performance optimization
-- [ ] Network-wide garbage collection
-- [ ] Advanced consistency guarantees
-
-## 🛠️ Technology Stack
-
-**Current Implementation**:
-- **FastCDC**: Content-defined chunking with variable-sized boundaries
-- **SHA-256**: Cryptographic content addressing and integrity verification
-- **Serde**: Serialization for file registry and metadata
-- **Clap**: Comprehensive command line interface
-- **UUID**: File identification and registry management
-
-**Planned Additions**:
-- **libp2p**: Peer-to-peer networking framework
-- **Tokio**: Asynchronous runtime for network operations
-- **S/Kademlia DHT**: Distributed hash table implementation
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Rust 1.76 or higher
-- Git
-
-### Installation & Usage
-
-**Option 1: Build and Run Locally**
 ```bash
-# Clone the repository
-git clone https://github.com/T-silva15/Nebula.git
-cd Nebula
-
-# Build the project
+# Build
 cargo build --release
 
-# Run commands using the built binary
-./target/release/nebula start
+# Start a node
+./target/release/nebula start --port 4001
+
+# Store a file
 ./target/release/nebula put /path/to/file.txt
+
+# Get file info
+./target/release/nebula list-files
+
+# View storage stats
+./target/release/nebula stats
 ```
 
-**Option 2: Install System-wide**
+## Multi-Node Setup
+
+Start multiple nodes on different ports - they'll discover each other automatically via mDNS:
+
 ```bash
-# Install directly from the repository
-cargo install --path .
+# Terminal 1
+nebula start --port 4001 --storage /tmp/node1
 
-# Now use 'nebula' command anywhere
-nebula start
-nebula put /path/to/file.txt
-nebula stats
+# Terminal 2
+nebula start --port 4002 --storage /tmp/node2
 ```
 
-**Basic Usage Examples**
+Nodes automatically:
+- Discover peers via mDNS
+- Exchange peer info via Identify protocol
+- Update Kademlia DHT routing tables
+- Ping to verify connectivity
+
+## CLI Commands
+
+### Node Management
 ```bash
-# Start a node (interactive mode)
-nebula start
-
-# Start a node in background (daemon mode)
-nebula start --daemon
-
-# Store a file and get its ID
-nebula put document.pdf
-
-# Retrieve a file by ID (full UUID or 8-char short ID)
-nebula get a1b2c3d4 retrieved_document.pdf
-
-# View storage statistics and deduplication ratios
-nebula stats
-
-# List all stored files with metadata
-nebula list-files --verbose
+nebula start [--port PORT] [--storage PATH]  # Start node
+nebula status                                 # Show node status
+nebula stop                                   # Stop running node
 ```
 
-### Deduplication Testing
-See [DEDUPLICATION_TESTING.md](./DEDUPLICATION_TESTING.md) for comprehensive deduplication results and testing methodology.
+### File Operations
+```bash
+nebula put <file>                  # Store a file
+nebula get <file_id> <output>      # Retrieve a file
+nebula list                        # List stored chunks
+nebula list-files                  # List registered files
+nebula stats                       # Storage statistics
+```
 
-## 🗺️ Feature Roadmap (What's Left)
+### Network Commands
+```bash
+nebula network status              # Network status
+nebula network id                  # Show local peer ID
+nebula peer list                   # List connected peers
+nebula peer connect <multiaddr>    # Connect to a peer
+```
 
-### Phase 3: Peer-to-Peer Networking
-**Goal**: Enable multiple nodes to communicate and share chunks
+### DHT Commands
+```bash
+nebula dht stats                   # DHT statistics
+nebula dht publish <address>       # Announce content
+nebula dht find <address>          # Find content providers
+```
 
-**Core Components**:
-- **libp2p Integration**: Implement robust P2P communication layer
-- **Peer Discovery**: Bootstrap nodes and peer finding mechanisms  
-- **Connection Management**: Handle peer connections, reconnections, and timeouts
-- **Chunk Transfer Protocol**: Request/response system for chunk sharing
-- **Security Layer**: Peer authentication and encrypted communication
-- **Network CLI**: Commands for peer management and network status
+## Architecture
 
-**Deliverables**:
-- Multi-node chunk sharing functionality
-- Distributed file reconstruction across peers
-- Network health monitoring and diagnostics
-- Cross-node deduplication validation
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         Node                                 │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ File Registry│  │Content Store │  │   Network    │      │
+│  │  (metadata)  │  │  (chunks)    │  │   (libp2p)   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                              │               │
+│                                    ┌─────────┴─────────┐    │
+│                                    │                   │    │
+│                              ┌─────┴─────┐     ┌───────┴──┐ │
+│                              │ Kademlia  │     │  mDNS    │ │
+│                              │   DHT     │     │Discovery │ │
+│                              └───────────┘     └──────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### Phase 4: Distributed Hash Table
-**Goal**: Implement efficient content location and routing
+## Tech Stack
 
-**Core Components**:
-- **Kademlia DHT**: Industry-standard DHT for content routing
-- **Distributed Indexing**: Chunk location tracking across the network
-- **Routing Optimization**: Efficient peer selection and content discovery
-- **Network Topology**: Dynamic network structure management
-- **Fault Tolerance**: Handle node failures and network partitions
+- **libp2p** - P2P networking (TCP, Noise, Yamux, Kademlia, mDNS)
+- **tokio** - Async runtime
+- **FastCDC** - Content-defined chunking
+- **SHA-256** - Content addressing
+- **serde** - Serialization
 
-**Deliverables**:
-- O(log N) content lookup complexity
-- Automatic load balancing across nodes
-- Resilient network topology management
-- Performance benchmarking and optimization
+## Development
 
-### Phase 5: Advanced Distributed Features (Q4 2025)
-**Goal**: Production-ready distributed file system
+```bash
+# Run tests
+cargo test
 
-**Core Components**:
-- **Proper File Browsing**: Simple and clean file browser 
-- **Replication Strategies**: Configurable redundancy and availability
-- **Cross-Network Deduplication**: Global chunk sharing optimization
-- **Consistency Models**: Strong vs eventual consistency options
-- **Garbage Collection**: Distributed cleanup of unused chunks
-- **Performance Optimization**: Caching, prefetching, and bandwidth management
-- **Monitoring & Observability**: Comprehensive system metrics and alerting
+# Run with verbose output
+cargo run -- start --verbose
 
-**Deliverables**:
-- Production-grade reliability and performance
-- Configurable replication and consistency guarantees
-- Advanced monitoring and operational tooling
-- Comprehensive documentation and deployment guides
+# Build release
+cargo build --release
+```
 
-## 📚 Architecture
+## License
 
-### Current Architecture (Phase 2)
-- **Node Management**: Local node lifecycle and configuration
-- **Content Addressing**: SHA-256 based content identification
-- **Storage Layer**: Persistent chunk storage with deduplication
-- **Chunking Engine**: FastCDC variable-sized content-defined chunking
-- **File Registry**: UUID-based file metadata and reconstruction
-- **CLI Interface**: Comprehensive command-line operations
-
-### Planned Architecture (Phase 3+)
-- **Network Layer**: libp2p-based peer communication and discovery
-- **DHT Layer**: Kademlia distributed hash table for content routing
-- **Replication Engine**: Configurable redundancy and fault tolerance
-- **Consistency Manager**: Distributed state synchronization
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) for details.
