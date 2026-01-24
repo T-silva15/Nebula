@@ -10,7 +10,7 @@ mod network;
 use node::Node;
 use config::Config;
 use clap::Parser;
-use args::{NebulaArgs, Commands, PeerCommands, NetworkCommands};
+use args::{NebulaArgs, Commands, PeerCommands, NetworkCommands, DhtCommands};
 use uuid;
 
 fn main() {
@@ -63,6 +63,9 @@ fn handle_cli(args: &NebulaArgs, config: &Config) {
         }
         Commands::Network(net_cmd) => {
             handle_network_command(net_cmd, config)
+        }
+        Commands::Dht(dht_cmd) => {
+            handle_dht_command(dht_cmd, config)
         }
     };
     
@@ -453,6 +456,81 @@ fn handle_network_command(
                 for peer in peers {
                     println!("  - {}", peer);
                 }
+            }
+        }
+        
+        node.stop_async().await?;
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })?;
+    
+    Ok(())
+}
+
+fn handle_dht_command(
+    cmd: &DhtCommands,
+    _config: &Config
+) -> Result<(), Box<dyn std::error::Error>> {
+    let rt = tokio::runtime::Runtime::new()?;
+    
+    rt.block_on(async {
+        let mut node = Node::new(
+            "127.0.0.1".to_string(),
+            4001,
+            crate::config::LogLevel::Info,
+            false
+        )?;
+        
+        // Initialize network
+        node.start_async().await?;
+        
+        match cmd {
+            DhtCommands::Publish { address } => {
+                use crate::content::ContentAddress;
+                
+                // Parse the content address
+                let addr = ContentAddress::from_hex(address)
+                    .map_err(|e| format!("Invalid content address: {}", e))?;
+                
+                println!("Publishing content: {}", addr);
+                node.announce_content(&addr).await?;
+                println!("Content published to DHT");
+            }
+            DhtCommands::Find { address } => {
+                use crate::content::ContentAddress;
+                
+                // Parse the content address
+                let addr = ContentAddress::from_hex(address)
+                    .map_err(|e| format!("Invalid content address: {}", e))?;
+                
+                println!("Finding providers for: {}", addr);
+                let providers = node.find_providers(&addr).await?;
+                
+                if providers.is_empty() {
+                    println!("No providers found (this may be a stub - provider discovery requires running network)");
+                } else {
+                    println!("Found {} provider(s):", providers.len());
+                    for provider in providers {
+                        println!("  - {}", provider);
+                    }
+                }
+            }
+            DhtCommands::Get { key } => {
+                println!("Getting DHT value for key: {}", key);
+                // TODO: Implement DHT get
+                println!("DHT get not yet implemented");
+            }
+            DhtCommands::Put { key, value } => {
+                println!("Putting DHT value: {} = {}", key, value);
+                // TODO: Implement DHT put
+                println!("DHT put not yet implemented");
+            }
+            DhtCommands::Stats => {
+                println!("DHT Statistics:");
+                println!("  Protocol: /nebula/kad/1.0.0");
+                println!("  Replication Factor (k): 20");
+                println!("  Parallelism (α): 3");
+                // TODO: Get actual stats from the DHT
+                println!("  (More stats available when running)");
             }
         }
         

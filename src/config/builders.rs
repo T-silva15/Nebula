@@ -41,7 +41,8 @@ impl Config {
             },
             // Peer and Network commands don't need special config handling
             crate::args::Commands::Peer(_) | 
-            crate::args::Commands::Network(_) => {
+            crate::args::Commands::Network(_) |
+            crate::args::Commands::Dht(_) => {
                 // No storage config needed for these commands
             },
         }

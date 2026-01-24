@@ -128,6 +128,10 @@ pub enum Commands {
     /// Network status and management
     #[command(subcommand)]
     Network(NetworkCommands),
+    
+    /// DHT (Distributed Hash Table) commands
+    #[command(subcommand)]
+    Dht(DhtCommands),
 }
 
 /// Peer management subcommands
@@ -166,4 +170,37 @@ pub enum NetworkCommands {
     
     /// List discovered peers (including not connected)
     Discover,
+}
+
+/// DHT (Distributed Hash Table) commands
+#[derive(Subcommand, Debug)]
+pub enum DhtCommands {
+    /// Announce content to the DHT network
+    Publish {
+        /// Content address (hash) to announce
+        address: String,
+    },
+    
+    /// Find providers for content
+    Find {
+        /// Content address (hash) to find providers for
+        address: String,
+    },
+    
+    /// Get a value from the DHT
+    Get {
+        /// Key to retrieve
+        key: String,
+    },
+    
+    /// Put a value in the DHT
+    Put {
+        /// Key to store
+        key: String,
+        /// Value to store
+        value: String,
+    },
+    
+    /// Show DHT statistics
+    Stats,
 }

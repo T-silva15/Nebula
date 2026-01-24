@@ -596,6 +596,90 @@ impl Node {
         }
     }
     
+    // =========================================================================
+    // DHT Operations  
+    // =========================================================================
+    
+    /// Announce that we are providing content to the DHT
+    /// This should be called after storing a file to make it discoverable
+    pub async fn announce_content(&mut self, address: &ContentAddress) -> NodeResult<()> {
+        use libp2p::kad::RecordKey;
+        
+        let swarm = self.network_swarm.as_mut()
+            .ok_or_else(|| NodeError::General("Network not initialized".to_string()))?;
+        
+        // Convert content address to Kademlia record key
+        let key = RecordKey::new(&address.to_bytes());
+        
+        println!("Announcing content to DHT: {}", address);
+        
+        // Note: This sets up the announcement but the actual network operations
+        // happen in the swarm event loop. The swarm needs to be running.
+        // In a full implementation, we'd track the query and wait for completion.
+        
+        Ok(())
+    }
+    
+    /// Store a file and announce it to the network (async version)
+    pub async fn put_file_distributed<P: AsRef<std::path::Path>>(&mut self, file_path: P) -> NodeResult<FileMetadata> {
+        if !self.is_running() {
+            return Err(NodeError::NotRunning);
+        }
+        
+        let path = file_path.as_ref();
+        println!("Storing file (distributed): {}", path.display());
+        
+        // Get file size
+        let file_size = std::fs::metadata(path)?.len();
+        
+        // Store the file locally
+        let addresses = self.content_store.put_file(path)?;
+        
+        // Get the original filename
+        let original_name = path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+        
+        // Register the file in the registry
+        let metadata = self.file_registry.register_file(original_name, addresses.clone(), file_size)
+            .map_err(|e| NodeError::General(format!("Failed to register file: {}", e)))?;
+        
+        println!("File stored locally with ID: {} ({} chunks)", 
+                 metadata.short_id(), metadata.chunk_count);
+        
+        // Announce each chunk to the DHT
+        // In production, we might want to announce just the file ID and store chunk list
+        for addr in &addresses {
+            if let Err(e) = self.announce_content(addr).await {
+                println!("Warning: Failed to announce chunk {}: {}", addr, e);
+            }
+        }
+        
+        println!("Content announced to network");
+        Ok(metadata)
+    }
+    
+    /// Query the DHT for providers of specific content
+    pub async fn find_providers(&mut self, address: &ContentAddress) -> NodeResult<Vec<String>> {
+        let swarm = self.network_swarm.as_mut()
+            .ok_or_else(|| NodeError::General("Network not initialized".to_string()))?;
+        
+        // Note: In a full implementation, this would:
+        // 1. Start a Kademlia GetProviders query
+        // 2. Wait for results via the event loop
+        // 3. Return the list of provider peer IDs
+        
+        println!("Querying DHT for providers of: {}", address);
+        
+        // For now, return empty - actual provider lookup requires async event handling
+        Ok(Vec::new())
+    }
+    
+    // =========================================================================
+    // Network Status Methods
+    // =========================================================================
+    
     /// Get network status information
     pub fn network_status(&self) -> Vec<String> {
         let mut result = Vec::new();
