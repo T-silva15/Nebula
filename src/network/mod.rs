@@ -9,6 +9,7 @@ pub mod discovery;
 pub mod protocol;
 pub mod behaviour;
 pub mod swarm;
+pub mod dht;
 
 // Re-export commonly used types
 pub use peer::{PeerId, PeerInfo, PeerState};
@@ -17,6 +18,7 @@ pub use discovery::DiscoveryConfig;
 pub use protocol::{ChunkProtocol, ChunkRequest, ChunkResponse};
 pub use behaviour::NebulaBehaviour;
 pub use swarm::{NetworkSwarm, NetworkEvent, NetworkConfig};
+pub use dht::{DhtConfig, DhtMode, DhtError, ProviderManager};
 
 use thiserror::Error;
 

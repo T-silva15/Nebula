@@ -94,6 +94,19 @@ impl ContentAddress {
         &self.hash
     }
     
+    /// Get the hash as a Vec<u8> (for use with DHT keys)
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.hash.to_vec()
+    }
+    
+    /// Create a ContentAddress from raw hash bytes (assumes SHA256)
+    pub fn from_hash(hash: [u8; 32]) -> Self {
+        Self { 
+            hash, 
+            algorithm: HashAlgorithm::Sha256 
+        }
+    }
+    
     /// Get the hash algorithm
     pub fn algorithm(&self) -> HashAlgorithm {
         self.algorithm
