@@ -6,6 +6,7 @@ use futures::StreamExt;
 use libp2p::{
     identity::Keypair,
     identify,
+    kad,
     mdns,
     ping,
     request_response,
@@ -286,6 +287,10 @@ impl NetworkSwarm {
             NebulaBehaviourEvent::Mdns(mdns::Event::Discovered(peers)) => {
                 for (peer_id, addr) in peers {
                     println!("mDNS: Discovered peer {} at {}", peer_id, addr);
+                    
+                    // Add peer to Kademlia routing table
+                    swarm.behaviour_mut().add_address(&peer_id, addr.clone());
+                    
                     swarm.dial(addr.clone()).ok();
                     
                     if let Some(tx) = event_tx {
@@ -302,6 +307,11 @@ impl NetworkSwarm {
                 }
             }
             NebulaBehaviourEvent::Identify(identify::Event::Received { peer_id, info, .. }) => {
+                // Add identified peer's addresses to Kademlia
+                for addr in &info.listen_addrs {
+                    swarm.behaviour_mut().add_address(&peer_id, addr.clone());
+                }
+                
                 println!(
                     "Identified peer {}: {} ({})",
                     peer_id,
@@ -337,6 +347,9 @@ impl NetworkSwarm {
                     }
                 }
             }
+            NebulaBehaviourEvent::Kademlia(event) => {
+                Self::handle_kademlia_event(swarm, event).await;
+            }
             _ => {}
         }
     }
@@ -370,6 +383,107 @@ impl NetworkSwarm {
         }
     }
     
+    /// Handle Kademlia DHT events
+    async fn handle_kademlia_event(
+        swarm: &mut Swarm<NebulaBehaviour>,
+        event: kad::Event,
+    ) {
+        match event {
+            kad::Event::RoutingUpdated { peer, is_new_peer, addresses, .. } => {
+                println!(
+                    "Kademlia routing updated: peer={} new={} addresses={:?}",
+                    peer, is_new_peer, addresses
+                );
+            }
+            kad::Event::InboundRequest { request } => {
+                println!("Kademlia inbound request: {:?}", request);
+            }
+            kad::Event::OutboundQueryProgressed { id, result, stats, step } => {
+                match result {
+                    kad::QueryResult::Bootstrap(result) => {
+                        match result {
+                            Ok(kad::BootstrapOk { peer, num_remaining }) => {
+                                println!(
+                                    "Bootstrap progress: peer={} remaining={}",
+                                    peer, num_remaining
+                                );
+                            }
+                            Err(e) => {
+                                println!("Bootstrap error: {:?}", e);
+                            }
+                        }
+                    }
+                    kad::QueryResult::GetProviders(result) => {
+                        match result {
+                            Ok(kad::GetProvidersOk::FoundProviders { key, providers, .. }) => {
+                                println!(
+                                    "Found {} providers for key {:?}",
+                                    providers.len(),
+                                    key
+                                );
+                            }
+                            Ok(kad::GetProvidersOk::FinishedWithNoAdditionalRecord { .. }) => {
+                                println!("GetProviders query finished");
+                            }
+                            Err(e) => {
+                                println!("GetProviders error: {:?}", e);
+                            }
+                        }
+                    }
+                    kad::QueryResult::StartProviding(result) => {
+                        match result {
+                            Ok(kad::AddProviderOk { key }) => {
+                                println!("Started providing content: {:?}", key);
+                            }
+                            Err(e) => {
+                                println!("StartProviding error: {:?}", e);
+                            }
+                        }
+                    }
+                    kad::QueryResult::GetRecord(result) => {
+                        match result {
+                            Ok(kad::GetRecordOk::FoundRecord(record)) => {
+                                println!(
+                                    "Found record: key={:?} value_len={}",
+                                    record.record.key,
+                                    record.record.value.len()
+                                );
+                            }
+                            Ok(kad::GetRecordOk::FinishedWithNoAdditionalRecord { .. }) => {
+                                println!("GetRecord query finished");
+                            }
+                            Err(e) => {
+                                println!("GetRecord error: {:?}", e);
+                            }
+                        }
+                    }
+                    kad::QueryResult::PutRecord(result) => {
+                        match result {
+                            Ok(kad::PutRecordOk { key }) => {
+                                println!("Successfully stored record: {:?}", key);
+                            }
+                            Err(e) => {
+                                println!("PutRecord error: {:?}", e);
+                            }
+                        }
+                    }
+                    _ => {
+                        println!("Kademlia query progressed: id={:?} stats={:?}", id, stats);
+                    }
+                }
+                
+                // Log query step info
+                if step.last {
+                    println!("Query {:?} completed", id);
+                }
+            }
+            kad::Event::ModeChanged { new_mode } => {
+                println!("Kademlia mode changed to: {:?}", new_mode);
+            }
+            _ => {}
+        }
+    }
+    
     /// Start listening on configured addresses
     pub async fn start_listening(&mut self) -> NetworkResult<()> {
         // For now, just mark as running - actual listening happens in run()
@@ -378,13 +492,55 @@ impl NetworkSwarm {
     }
     
     /// Run the network event loop
+    /// This function runs the event loop directly and blocks until cancelled.
+    /// Use tokio::select! to run it alongside other futures.
     pub async fn run(
         &mut self, 
         content_store: Arc<RwLock<ContentStore>>,
         event_tx: Option<mpsc::Sender<NetworkEvent>>
     ) -> NetworkResult<()> {
-        self.event_tx = event_tx;
-        self.start(content_store).await
+        self.event_tx = event_tx.clone();
+        
+        // Build transport
+        let transport = NetworkTransport::new()
+            .build(&self.keypair)
+            .map_err(|e| NetworkError::Transport(e.to_string()))?;
+        
+        // Create behaviour
+        let behaviour = NebulaBehaviour::new(self.local_peer_id, self.keypair.public())
+            .map_err(|e| NetworkError::Protocol(e.to_string()))?;
+        
+        // Build swarm
+        let mut swarm = Swarm::new(
+            transport,
+            behaviour,
+            self.local_peer_id,
+            libp2p::swarm::Config::with_tokio_executor(),
+        );
+        
+        // Start listening
+        for addr in &self.config.listen_addresses {
+            swarm.listen_on(addr.clone())
+                .map_err(|e| NetworkError::Transport(e.to_string()))?;
+        }
+        
+        // Connect to bootstrap nodes
+        for (peer_id, addr) in self.config.discovery.parse_bootstrap_nodes() {
+            swarm.dial(addr.clone())
+                .map_err(|e| NetworkError::Connection(e.to_string()))?;
+            
+            let mut peer_info = PeerInfo::new(NebulaPeerId::from_libp2p(peer_id));
+            peer_info.add_address(addr);
+            self.peers.insert(peer_id, peer_info);
+        }
+        
+        self.running = true;
+        
+        // Run the event loop directly (blocking)
+        Self::run_event_loop(swarm, content_store, event_tx).await;
+        
+        self.running = false;
+        Ok(())
     }
     
     /// Dial a peer at a specific multiaddress

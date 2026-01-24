@@ -4,6 +4,7 @@
 
 use libp2p::{
     identify,
+    kad::{self, store::MemoryStore},
     mdns,
     ping,
     request_response,
@@ -28,6 +29,9 @@ pub struct NebulaBehaviour {
     
     /// Chunk transfer protocol
     pub chunk_protocol: ChunkProtocol,
+    
+    /// Kademlia DHT for distributed content discovery
+    pub kademlia: kad::Behaviour<MemoryStore>,
 }
 
 /// Events emitted by the combined behaviour
@@ -37,6 +41,7 @@ pub enum NebulaBehaviourEvent {
     Identify(identify::Event),
     Mdns(mdns::Event),
     ChunkProtocol(request_response::Event<ChunkRequest, ChunkResponse>),
+    Kademlia(kad::Event),
 }
 
 impl From<ping::Event> for NebulaBehaviourEvent {
@@ -60,6 +65,12 @@ impl From<mdns::Event> for NebulaBehaviourEvent {
 impl From<request_response::Event<ChunkRequest, ChunkResponse>> for NebulaBehaviourEvent {
     fn from(event: request_response::Event<ChunkRequest, ChunkResponse>) -> Self {
         NebulaBehaviourEvent::ChunkProtocol(event)
+    }
+}
+
+impl From<kad::Event> for NebulaBehaviourEvent {
+    fn from(event: kad::Event) -> Self {
+        NebulaBehaviourEvent::Kademlia(event)
     }
 }
 
@@ -89,11 +100,19 @@ impl NebulaBehaviour {
         // Chunk transfer protocol
         let chunk_protocol = super::protocol::create_chunk_protocol();
         
+        // Kademlia DHT for distributed content discovery
+        // Using S/Kademlia parameters: k=20 replication factor
+        let store = MemoryStore::new(local_peer_id);
+        let mut kad_config = kad::Config::new(libp2p::StreamProtocol::new("/nebula/kad/1.0.0"));
+        kad_config.set_replication_factor(std::num::NonZeroUsize::new(20).unwrap());
+        let kademlia = kad::Behaviour::with_config(local_peer_id, store, kad_config);
+        
         Ok(Self {
             ping,
             identify,
             mdns,
             chunk_protocol,
+            kademlia,
         })
     }
     
@@ -109,6 +128,36 @@ impl NebulaBehaviour {
         response: ChunkResponse,
     ) -> Result<(), ChunkResponse> {
         self.chunk_protocol.send_response(channel, response)
+    }
+    
+    /// Add a peer address to the Kademlia routing table
+    pub fn add_address(&mut self, peer: &PeerId, addr: libp2p::Multiaddr) {
+        self.kademlia.add_address(peer, addr);
+    }
+    
+    /// Bootstrap the Kademlia DHT
+    pub fn bootstrap(&mut self) -> Result<kad::QueryId, kad::NoKnownPeers> {
+        self.kademlia.bootstrap()
+    }
+    
+    /// Start providing a content key
+    pub fn start_providing(&mut self, key: kad::RecordKey) -> Result<kad::QueryId, kad::store::Error> {
+        self.kademlia.start_providing(key)
+    }
+    
+    /// Get providers for a content key
+    pub fn get_providers(&mut self, key: kad::RecordKey) -> kad::QueryId {
+        self.kademlia.get_providers(key)
+    }
+    
+    /// Store a record in the DHT
+    pub fn put_record(&mut self, record: kad::Record, quorum: kad::Quorum) -> Result<kad::QueryId, kad::store::Error> {
+        self.kademlia.put_record(record, quorum)
+    }
+    
+    /// Get a record from the DHT
+    pub fn get_record(&mut self, key: kad::RecordKey) -> kad::QueryId {
+        self.kademlia.get_record(key)
     }
 }
 

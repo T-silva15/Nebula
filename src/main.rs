@@ -116,10 +116,23 @@ fn handle_start_command(
             
             println!("\nNode started. Press Ctrl+C to stop...");
             
-            // Wait for Ctrl+C
-            tokio::signal::ctrl_c().await?;
+            // Spawn the network event loop in the background
+            // Note: We need to take ownership for the spawn, so we use a channel to signal shutdown
+            let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
             
-            println!("\nStopping node...");
+            // Run network event loop until Ctrl+C
+            tokio::select! {
+                result = node.run_network() => {
+                    if let Err(e) = result {
+                        println!("Network error: {}", e);
+                    }
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    println!("\nStopping node...");
+                    drop(shutdown_tx); // Signal shutdown
+                }
+            }
+            
             node.stop_async().await?;
         }
         
