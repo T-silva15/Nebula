@@ -18,7 +18,7 @@ impl Config {
         
         // Apply command-specific arguments based on the command
         match &args.command {
-            crate::args::Commands::Start { port, storage, address, daemon } => {
+            crate::args::Commands::Start { port, storage, address, daemon, .. } => {
                 self.listen_port = *port;
                 if let Some(storage_path) = storage {
                     self.storage_dir = storage_path.clone();
@@ -38,6 +38,11 @@ impl Config {
                 if let Some(storage_path) = storage {
                     self.storage_dir = storage_path.clone();
                 }
+            },
+            // Peer and Network commands don't need special config handling
+            crate::args::Commands::Peer(_) | 
+            crate::args::Commands::Network(_) => {
+                // No storage config needed for these commands
             },
         }
         

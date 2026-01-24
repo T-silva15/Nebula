@@ -5,11 +5,12 @@ mod node;
 mod content;
 mod storage;
 mod file;
+mod network;
 
 use node::Node;
 use config::Config;
 use clap::Parser;
-use args::{NebulaArgs, Commands};
+use args::{NebulaArgs, Commands, PeerCommands, NetworkCommands};
 use uuid;
 
 fn main() {
@@ -30,8 +31,8 @@ fn main() {
 
 fn handle_cli(args: &NebulaArgs, config: &Config) {
     let result = match &args.command {
-        Commands::Start { port, storage, address, daemon } => {
-            handle_start_command(*port, storage.as_ref(), address, *daemon, config)
+        Commands::Start { port, storage, address, daemon, bootstrap } => {
+            handle_start_command(*port, storage.as_ref(), address, *daemon, bootstrap, config)
         }
         Commands::Put { file, storage, format } => {
             handle_put_command(file, storage.as_ref(), format, config)
@@ -57,6 +58,12 @@ fn handle_cli(args: &NebulaArgs, config: &Config) {
         Commands::Stop { storage } => {
             handle_stop_command(storage.as_ref(), config)
         }
+        Commands::Peer(peer_cmd) => {
+            handle_peer_command(peer_cmd, config)
+        }
+        Commands::Network(net_cmd) => {
+            handle_network_command(net_cmd, config)
+        }
     };
     
     if let Err(e) = result {
@@ -70,40 +77,54 @@ fn handle_start_command(
     _storage: Option<&std::path::PathBuf>, 
     address: &str, 
     daemon: bool,
+    _bootstrap: &[String],
     _config: &Config
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut node = Node::new(
-        address.to_string(),
-        port,
-        crate::config::LogLevel::Info,
-        daemon
-    )?;
+    // Use tokio runtime for async network operations
+    let rt = tokio::runtime::Runtime::new()?;
     
-    if daemon {
-        println!("Starting node in daemon mode...");
-        node.start()?;
+    rt.block_on(async {
+        let mut node = Node::new(
+            address.to_string(),
+            port,
+            crate::config::LogLevel::Info,
+            daemon
+        )?;
         
-        // In a real implementation, this would run indefinitely
-        // For now, we'll simulate daemon mode
-        println!("Node running in daemon mode. Press Ctrl+C to stop.");
-        
-        // Set up signal handler for graceful shutdown
-        match std::thread::park_timeout(std::time::Duration::from_secs(3600)) {
-            () => {
-                println!("Shutting down daemon...");
-                node.stop()?;
+        if daemon {
+            println!("Starting node in daemon mode with P2P networking...");
+            node.start_async().await?;
+            
+            // Run the network in the background
+            println!("Node running in daemon mode. Press Ctrl+C to stop.");
+            
+            // Set up signal handler
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    println!("\nShutting down daemon...");
+                    node.stop_async().await?;
+                }
             }
+        } else {
+            println!("Starting node in interactive mode with P2P networking...");
+            node.start_async().await?;
+            
+            // Show network info
+            for line in node.network_status() {
+                println!("{}", line);
+            }
+            
+            println!("\nNode started. Press Ctrl+C to stop...");
+            
+            // Wait for Ctrl+C
+            tokio::signal::ctrl_c().await?;
+            
+            println!("\nStopping node...");
+            node.stop_async().await?;
         }
-    } else {
-        println!("Starting node in interactive mode...");
-        node.start()?;
         
-        println!("Node started. Press Enter to stop...");
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        
-        node.stop()?;
-    }
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })?;
     
     Ok(())
 }
@@ -319,6 +340,111 @@ fn handle_list_files_command(
         }
         
         Ok(())
+    })?;
+    
+    Ok(())
+}
+
+fn handle_peer_command(
+    cmd: &PeerCommands,
+    _config: &Config
+) -> Result<(), Box<dyn std::error::Error>> {
+    let rt = tokio::runtime::Runtime::new()?;
+    
+    rt.block_on(async {
+        let mut node = Node::new(
+            "127.0.0.1".to_string(),
+            4001,
+            crate::config::LogLevel::Info,
+            false
+        )?;
+        
+        // Initialize network for peer operations
+        node.start_async().await?;
+        
+        match cmd {
+            PeerCommands::List => {
+                println!("Connected Peers:");
+                let peers = node.connected_peers();
+                if peers.is_empty() {
+                    println!("  No peers connected");
+                } else {
+                    for peer in peers {
+                        println!("  - {}", peer);
+                    }
+                }
+            }
+            PeerCommands::Connect { address } => {
+                println!("Connecting to: {}", address);
+                node.connect_peer(address).await?;
+                println!("Connection initiated");
+            }
+            PeerCommands::Disconnect { peer_id } => {
+                println!("Disconnecting from peer: {}", peer_id);
+                // TODO: Implement peer disconnection
+                println!("Peer disconnection not yet implemented");
+            }
+            PeerCommands::Info { peer_id } => {
+                println!("Peer info for: {}", peer_id);
+                // TODO: Implement peer info lookup
+                println!("Peer info lookup not yet implemented");
+            }
+        }
+        
+        node.stop_async().await?;
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })?;
+    
+    Ok(())
+}
+
+fn handle_network_command(
+    cmd: &NetworkCommands,
+    _config: &Config
+) -> Result<(), Box<dyn std::error::Error>> {
+    let rt = tokio::runtime::Runtime::new()?;
+    
+    rt.block_on(async {
+        let mut node = Node::new(
+            "127.0.0.1".to_string(),
+            4001,
+            crate::config::LogLevel::Info,
+            false
+        )?;
+        
+        // Initialize network
+        node.start_async().await?;
+        
+        match cmd {
+            NetworkCommands::Status => {
+                for line in node.network_status() {
+                    println!("{}", line);
+                }
+            }
+            NetworkCommands::Id => {
+                let status = node.network_status();
+                // Find and print just the peer ID line
+                for line in &status {
+                    if line.contains("Local Peer ID") || line.contains("Listening") {
+                        println!("{}", line.trim());
+                    }
+                }
+            }
+            NetworkCommands::Discover => {
+                println!("Discovering peers...");
+                // Give mDNS some time to discover
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                
+                let peers = node.connected_peers();
+                println!("Discovered {} peer(s):", peers.len());
+                for peer in peers {
+                    println!("  - {}", peer);
+                }
+            }
+        }
+        
+        node.stop_async().await?;
+        Ok::<(), Box<dyn std::error::Error>>(())
     })?;
     
     Ok(())

@@ -42,6 +42,10 @@ pub enum Commands {
         /// Run as daemon (background process)
         #[arg(short, long)]
         daemon: bool,
+        
+        /// Bootstrap node addresses (can be specified multiple times)
+        #[arg(long)]
+        bootstrap: Vec<String>,
     },
     
     /// Store a file in the distributed file system
@@ -116,4 +120,50 @@ pub enum Commands {
         #[arg(short, long)]
         storage: Option<PathBuf>,
     },
+    
+    /// Peer management commands
+    #[command(subcommand)]
+    Peer(PeerCommands),
+    
+    /// Network status and management
+    #[command(subcommand)]
+    Network(NetworkCommands),
+}
+
+/// Peer management subcommands
+#[derive(Subcommand, Debug)]
+pub enum PeerCommands {
+    /// List connected peers
+    List,
+    
+    /// Connect to a peer
+    Connect {
+        /// Peer multiaddress (e.g., /ip4/192.168.1.1/tcp/4001/p2p/12D3KooW...)
+        address: String,
+    },
+    
+    /// Disconnect from a peer
+    Disconnect {
+        /// Peer ID to disconnect
+        peer_id: String,
+    },
+    
+    /// Show peer information
+    Info {
+        /// Peer ID to show info for
+        peer_id: String,
+    },
+}
+
+/// Network management subcommands
+#[derive(Subcommand, Debug)]
+pub enum NetworkCommands {
+    /// Show network status
+    Status,
+    
+    /// Show local peer ID and addresses
+    Id,
+    
+    /// List discovered peers (including not connected)
+    Discover,
 }

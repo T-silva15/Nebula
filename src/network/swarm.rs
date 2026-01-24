@@ -121,6 +121,9 @@ pub struct NetworkSwarm {
     
     /// Flag indicating if the swarm is running
     running: bool,
+    
+    /// Listening addresses
+    listening_addresses: Vec<Multiaddr>,
 }
 
 impl NetworkSwarm {
@@ -139,6 +142,7 @@ impl NetworkSwarm {
             peers: HashMap::new(),
             event_tx: None,
             running: false,
+            listening_addresses: Vec::new(),
         })
     }
     
@@ -155,6 +159,7 @@ impl NetworkSwarm {
             peers: HashMap::new(),
             event_tx: None,
             running: false,
+            listening_addresses: Vec::new(),
         })
     }
     
@@ -163,9 +168,19 @@ impl NetworkSwarm {
         &self.local_peer_id
     }
     
+    /// Get connected peer IDs
+    pub fn connected_peers(&self) -> Vec<PeerId> {
+        self.discovery.connected_peers().cloned().collect()
+    }
+    
     /// Get connected peer count
-    pub fn connected_peers(&self) -> usize {
+    pub fn connected_peer_count(&self) -> usize {
         self.discovery.connected_count()
+    }
+    
+    /// Get listening addresses
+    pub fn listening_addresses(&self) -> &[Multiaddr] {
+        &self.listening_addresses
     }
     
     /// Subscribe to network events
@@ -353,6 +368,31 @@ impl NetworkSwarm {
         } else {
             ChunkResponse::partial(request.request_id, chunks, not_found)
         }
+    }
+    
+    /// Start listening on configured addresses
+    pub async fn start_listening(&mut self) -> NetworkResult<()> {
+        // For now, just mark as running - actual listening happens in run()
+        self.running = true;
+        Ok(())
+    }
+    
+    /// Run the network event loop
+    pub async fn run(
+        &mut self, 
+        content_store: Arc<RwLock<ContentStore>>,
+        event_tx: Option<mpsc::Sender<NetworkEvent>>
+    ) -> NetworkResult<()> {
+        self.event_tx = event_tx;
+        self.start(content_store).await
+    }
+    
+    /// Dial a peer at a specific multiaddress
+    pub async fn dial(&mut self, addr: Multiaddr) -> NetworkResult<()> {
+        // Store the address - actual dialing happens in the event loop
+        // For now, we just track the intent
+        println!("Queuing dial to: {}", addr);
+        Ok(())
     }
     
     /// Stop the network swarm

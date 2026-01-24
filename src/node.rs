@@ -1,11 +1,14 @@
 use uuid::Uuid;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 use crate::config::{NodeState, LogLevel};
 use crate::storage::{ContentStore, ContentStoreConfig, ChunkConfig};
 use crate::content::ContentAddress;
 use crate::file::{FileRegistry, FileMetadata, FileId};
+use crate::network::{NetworkConfig, NetworkSwarm, NetworkEvent};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeError {
@@ -20,6 +23,9 @@ pub enum NodeError {
     
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+    
+    #[error("Network error: {0}")]
+    Network(#[from] crate::network::NetworkError),
     
     #[error("Content not found")]
     ContentNotFound,
@@ -86,6 +92,10 @@ pub struct Node {
     pub daemon_mode: bool,      // Whether to run as a daemon
     pub content_store: ContentStore, // Content-addressable storage
     pub file_registry: FileRegistry, // File-level metadata registry
+    // Network components (initialized when network is started)
+    network_config: Option<NetworkConfig>,
+    network_swarm: Option<NetworkSwarm>,
+    content_store_shared: Option<Arc<RwLock<ContentStore>>>,
 }
 
 impl Node {
@@ -149,6 +159,9 @@ impl Node {
             daemon_mode,
             content_store,
             file_registry,
+            network_config: None,
+            network_swarm: None,
+            content_store_shared: None,
         })
     }
 
@@ -459,7 +472,158 @@ impl Node {
         result.push(format!("  Total size: {} bytes", stats.total_size));
         result.push(format!("  Content store: {}", stats.storage_path.display()));
         
+        // Add network info if available
+        if let Some(ref swarm) = self.network_swarm {
+            result.push("".to_string());
+            result.push("Network:".to_string());
+            result.push(format!("  Local Peer ID: {}", swarm.local_peer_id()));
+            result.push(format!("  Connected Peers: {}", swarm.connected_peers().len()));
+        }
+        
         Ok(result)
+    }
+    
+    // =========================================================================
+    // Network-related methods (async)
+    // =========================================================================
+    
+    /// Initialize the network swarm for P2P communication
+    pub async fn init_network(&mut self) -> NodeResult<()> {
+        use libp2p::Multiaddr;
+        
+        println!("Initializing P2P network...");
+        
+        // Create network configuration
+        let listen_addr: Multiaddr = format!("/ip4/{}/tcp/{}", self.address, self.port)
+            .parse()
+            .map_err(|e| NodeError::General(format!("Invalid address: {}", e)))?;
+        
+        let network_config = NetworkConfig {
+            listen_addresses: vec![listen_addr],
+            ..Default::default()
+        };
+        
+        // Create the network swarm
+        let swarm = NetworkSwarm::new(network_config.clone())?;
+        
+        println!("Local Peer ID: {}", swarm.local_peer_id());
+        
+        self.network_config = Some(network_config);
+        self.network_swarm = Some(swarm);
+        
+        Ok(())
+    }
+    
+    /// Start the network event loop (should be run in a background task)
+    pub async fn run_network(&mut self) -> NodeResult<()> {
+        let swarm = self.network_swarm.as_mut()
+            .ok_or_else(|| NodeError::General("Network not initialized".to_string()))?;
+        
+        // Create shared content store for network operations
+        // Note: This is a simplified approach - in production you'd want better state management
+        let store_config = ContentStoreConfig {
+            storage_path: self.storage_dir.join("content"),
+            chunk_config: ChunkConfig::default(),
+            verify_on_read: true,
+        };
+        let content_store = ContentStore::new(store_config)?;
+        let shared_store = Arc::new(RwLock::new(content_store));
+        self.content_store_shared = Some(shared_store.clone());
+        
+        // Start listening
+        swarm.start_listening().await?;
+        
+        println!("Network started. Listening for peers...");
+        
+        // Run the event loop
+        swarm.run(shared_store, None).await?;
+        
+        Ok(())
+    }
+    
+    /// Start the network asynchronously
+    pub async fn start_async(&mut self) -> NodeResult<()> {
+        self.state = NodeState::Starting;
+        println!("Starting node {} on {}:{}", self.id, self.address, self.port);
+        println!("Storage directory: {}", self.storage_dir.display());
+        
+        // Initialize network
+        self.init_network().await?;
+        
+        self.state = NodeState::Running;
+        println!("Node started successfully");
+        Ok(())
+    }
+    
+    /// Stop the network
+    pub async fn stop_async(&mut self) -> NodeResult<()> {
+        self.state = NodeState::Stopping;
+        println!("Stopping node {}", self.id);
+        
+        // Stop the network swarm
+        if let Some(ref mut swarm) = self.network_swarm {
+            swarm.stop().await?;
+        }
+        
+        self.state = NodeState::Stopped;
+        println!("Node stopped successfully");
+        Ok(())
+    }
+    
+    /// Connect to a peer by multiaddress
+    pub async fn connect_peer(&mut self, addr: &str) -> NodeResult<()> {
+        use libp2p::Multiaddr;
+        
+        let swarm = self.network_swarm.as_mut()
+            .ok_or_else(|| NodeError::General("Network not initialized".to_string()))?;
+        
+        let multiaddr: Multiaddr = addr.parse()
+            .map_err(|e| NodeError::General(format!("Invalid multiaddr: {}", e)))?;
+        
+        swarm.dial(multiaddr).await?;
+        println!("Connecting to peer at {}", addr);
+        Ok(())
+    }
+    
+    /// Get list of connected peers
+    pub fn connected_peers(&self) -> Vec<String> {
+        if let Some(ref swarm) = self.network_swarm {
+            swarm.connected_peers().iter()
+                .map(|p| p.to_string())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+    
+    /// Get network status information
+    pub fn network_status(&self) -> Vec<String> {
+        let mut result = Vec::new();
+        
+        if let Some(ref swarm) = self.network_swarm {
+            result.push("Network Status: Active".to_string());
+            result.push(format!("  Local Peer ID: {}", swarm.local_peer_id()));
+            
+            let peers = swarm.connected_peers();
+            result.push(format!("  Connected Peers: {}", peers.len()));
+            
+            if !peers.is_empty() {
+                result.push("  Peer List:".to_string());
+                for peer in peers {
+                    result.push(format!("    - {}", peer));
+                }
+            }
+            
+            // Show listening addresses
+            result.push("  Listening Addresses:".to_string());
+            for addr in swarm.listening_addresses() {
+                result.push(format!("    - {}", addr));
+            }
+        } else {
+            result.push("Network Status: Not Initialized".to_string());
+        }
+        
+        result
     }
 }
 
