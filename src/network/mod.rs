@@ -17,7 +17,7 @@ pub use transport::NetworkTransport;
 pub use discovery::DiscoveryConfig;
 pub use protocol::{ChunkProtocol, ChunkRequest, ChunkResponse};
 pub use behaviour::NebulaBehaviour;
-pub use swarm::{NetworkSwarm, NetworkEvent, NetworkConfig};
+pub use swarm::{NetworkSwarm, NetworkEvent, NetworkConfig, NetworkCommand};
 pub use dht::{DhtConfig, DhtMode, DhtError, ProviderManager};
 
 use thiserror::Error;

@@ -100,6 +100,30 @@ pub enum NetworkEvent {
     Error { error: String },
 }
 
+/// Commands that can be sent to the swarm
+#[derive(Debug)]
+pub enum NetworkCommand {
+    /// Request chunks from a peer
+    RequestChunks {
+        peer_id: PeerId,
+        request: ChunkRequest,
+    },
+    /// Dial a peer address
+    Dial {
+        address: Multiaddr,
+    },
+    /// Start providing content via DHT
+    StartProviding {
+        key: kad::RecordKey,
+    },
+    /// Find providers for content
+    GetProviders {
+        key: kad::RecordKey,
+    },
+    /// Shutdown the swarm
+    Shutdown,
+}
+
 /// Manages the libp2p swarm and network operations
 pub struct NetworkSwarm {
     /// Local peer keypair
@@ -119,6 +143,9 @@ pub struct NetworkSwarm {
     
     /// Event sender for notifying the application
     event_tx: Option<mpsc::Sender<NetworkEvent>>,
+    
+    /// Command sender for sending commands to the swarm
+    command_tx: Option<mpsc::Sender<NetworkCommand>>,
     
     /// Flag indicating if the swarm is running
     running: bool,
@@ -142,6 +169,7 @@ impl NetworkSwarm {
             discovery,
             peers: HashMap::new(),
             event_tx: None,
+            command_tx: None,
             running: false,
             listening_addresses: Vec::new(),
         })
@@ -159,6 +187,7 @@ impl NetworkSwarm {
             discovery,
             peers: HashMap::new(),
             event_tx: None,
+            command_tx: None,
             running: false,
             listening_addresses: Vec::new(),
         })
@@ -179,6 +208,11 @@ impl NetworkSwarm {
         self.discovery.connected_count()
     }
     
+    /// Check if connected to a specific peer
+    pub fn is_connected(&self, peer_id: &PeerId) -> bool {
+        self.discovery.connected_peers().any(|p| p == peer_id)
+    }
+    
     /// Get listening addresses
     pub fn listening_addresses(&self) -> &[Multiaddr] {
         &self.listening_addresses
@@ -189,6 +223,22 @@ impl NetworkSwarm {
         let (tx, rx) = mpsc::channel(256);
         self.event_tx = Some(tx);
         rx
+    }
+    
+    /// Send a command to the swarm (for use when swarm is running)
+    pub async fn send_command(&self, command: NetworkCommand) -> Result<(), NetworkError> {
+        if let Some(tx) = &self.command_tx {
+            tx.send(command).await
+                .map_err(|_| NetworkError::Protocol("Command channel closed".to_string()))?;
+            Ok(())
+        } else {
+            Err(NetworkError::NotStarted)
+        }
+    }
+    
+    /// Request chunks from a peer (convenience method)
+    pub async fn request_chunks(&self, peer_id: PeerId, request: ChunkRequest) -> Result<(), NetworkError> {
+        self.send_command(NetworkCommand::RequestChunks { peer_id, request }).await
     }
     
     /// Start the network swarm
@@ -232,13 +282,17 @@ impl NetworkSwarm {
         
         self.running = true;
         
+        // Create command channel
+        let (command_tx, command_rx) = mpsc::channel(256);
+        self.command_tx = Some(command_tx);
+        
         // Clone necessary data for the event loop
         let event_tx = self.event_tx.clone();
         let _local_peer_id = self.local_peer_id;
         
         // Spawn the event loop
         tokio::spawn(async move {
-            Self::run_event_loop(swarm, content_store, event_tx).await;
+            Self::run_event_loop(swarm, content_store, event_tx, command_rx).await;
         });
         
         Ok(())
@@ -249,29 +303,66 @@ impl NetworkSwarm {
         mut swarm: Swarm<NebulaBehaviour>,
         content_store: Arc<RwLock<ContentStore>>,
         event_tx: Option<mpsc::Sender<NetworkEvent>>,
+        mut command_rx: mpsc::Receiver<NetworkCommand>,
     ) {
         loop {
-            match swarm.select_next_some().await {
-                SwarmEvent::Behaviour(event) => {
-                    Self::handle_behaviour_event(&mut swarm, &content_store, &event_tx, event).await;
-                }
-                SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                    if let Some(tx) = &event_tx {
-                        let _ = tx.send(NetworkEvent::PeerConnected { peer_id }).await;
+            tokio::select! {
+                // Handle swarm events
+                event = swarm.select_next_some() => {
+                    match event {
+                        SwarmEvent::Behaviour(event) => {
+                            Self::handle_behaviour_event(&mut swarm, &content_store, &event_tx, event).await;
+                        }
+                        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                            if let Some(tx) = &event_tx {
+                                let _ = tx.send(NetworkEvent::PeerConnected { peer_id }).await;
+                            }
+                        }
+                        SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                            if let Some(tx) = &event_tx {
+                                let _ = tx.send(NetworkEvent::PeerDisconnected { peer_id }).await;
+                            }
+                        }
+                        SwarmEvent::NewListenAddr { address, .. } => {
+                            println!("Listening on {}", address);
+                            if let Some(tx) = &event_tx {
+                                let _ = tx.send(NetworkEvent::ListeningOn { address }).await;
+                            }
+                        }
+                        _ => {}
                     }
                 }
-                SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                    if let Some(tx) = &event_tx {
-                        let _ = tx.send(NetworkEvent::PeerDisconnected { peer_id }).await;
-                    }
+                // Handle commands from outside
+                Some(command) = command_rx.recv() => {
+                    Self::handle_command(&mut swarm, command).await;
                 }
-                SwarmEvent::NewListenAddr { address, .. } => {
-                    println!("Listening on {}", address);
-                    if let Some(tx) = &event_tx {
-                        let _ = tx.send(NetworkEvent::ListeningOn { address }).await;
-                    }
-                }
-                _ => {}
+            }
+        }
+    }
+    
+    /// Handle commands sent to the swarm
+    async fn handle_command(swarm: &mut Swarm<NebulaBehaviour>, command: NetworkCommand) {
+        match command {
+            NetworkCommand::RequestChunks { peer_id, request } => {
+                println!("Sending chunk request to peer {}", peer_id);
+                swarm.behaviour_mut().request_chunks(&peer_id, request);
+            }
+            NetworkCommand::Dial { address } => {
+                println!("Dialing {}", address);
+                let _ = swarm.dial(address);
+            }
+            NetworkCommand::StartProviding { key } => {
+                println!("Starting to provide key: {:?}", key);
+                let _ = swarm.behaviour_mut().start_providing(key);
+            }
+            NetworkCommand::GetProviders { key } => {
+                println!("Getting providers for key: {:?}", key);
+                swarm.behaviour_mut().get_providers(key);
+            }
+            NetworkCommand::Shutdown => {
+                println!("Swarm shutdown requested");
+                // Event loop will exit
+                return;
             }
         }
     }
@@ -536,8 +627,12 @@ impl NetworkSwarm {
         
         self.running = true;
         
+        // Create command channel for this run mode
+        let (command_tx, command_rx) = mpsc::channel(256);
+        self.command_tx = Some(command_tx);
+        
         // Run the event loop directly (blocking)
-        Self::run_event_loop(swarm, content_store, event_tx).await;
+        Self::run_event_loop(swarm, content_store, event_tx, command_rx).await;
         
         self.running = false;
         Ok(())

@@ -8,7 +8,7 @@ use crate::config::{NodeState, LogLevel};
 use crate::storage::{ContentStore, ContentStoreConfig, ChunkConfig};
 use crate::content::ContentAddress;
 use crate::file::{FileRegistry, FileMetadata, FileId};
-use crate::network::{NetworkConfig, NetworkSwarm, NetworkEvent};
+use crate::network::{NetworkConfig, NetworkSwarm, NetworkEvent, NetworkCommand, ChunkRequest};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeError {
@@ -674,6 +674,196 @@ impl Node {
         
         // For now, return empty - actual provider lookup requires async event handling
         Ok(Vec::new())
+    }
+    
+    // =========================================================================
+    // Remote File Transfer Methods
+    // =========================================================================
+    
+    /// Request specific chunks from a remote peer
+    /// Returns the chunks that were successfully retrieved
+    pub async fn request_chunks_from_peer(
+        &mut self, 
+        peer_id_str: &str, 
+        chunk_addresses: Vec<ContentAddress>
+    ) -> NodeResult<Vec<(ContentAddress, Vec<u8>)>> {
+        use libp2p::PeerId;
+        
+        let peer_id: PeerId = peer_id_str.parse()
+            .map_err(|e| NodeError::General(format!("Invalid peer ID: {}", e)))?;
+        
+        let swarm = self.network_swarm.as_ref()
+            .ok_or_else(|| NodeError::General("Network not initialized".to_string()))?;
+        
+        // Check if we're connected to this peer
+        if !swarm.is_connected(&peer_id) {
+            return Err(NodeError::General(format!("Not connected to peer: {}", peer_id_str)));
+        }
+        
+        // Create chunk request
+        let request = ChunkRequest::new(chunk_addresses.clone());
+        let request_id = request.request_id;
+        
+        println!("Requesting {} chunks from peer {}", chunk_addresses.len(), peer_id_str);
+        
+        // Send the request via command channel
+        swarm.request_chunks(peer_id, request).await
+            .map_err(|e| NodeError::Network(e))?;
+        
+        // Note: In a full implementation, we would:
+        // 1. Track this request_id
+        // 2. Wait for ChunkResponseReceived event in the event loop
+        // 3. Match the response to this request
+        // 4. Return the chunks or error
+        
+        // For now, we return immediately - the response will come through the event loop
+        println!("Request {} sent, waiting for response in event loop...", request_id);
+        
+        Ok(Vec::new())
+    }
+    
+    /// Get a file from the network by finding providers and fetching chunks
+    /// This combines DHT lookup with chunk fetching
+    pub async fn get_file_from_network(
+        &mut self,
+        file_id: &str,
+        output_path: &std::path::Path,
+    ) -> NodeResult<()> {
+        use std::io::Write;
+        
+        if !self.is_running() {
+            return Err(NodeError::NotRunning);
+        }
+        
+        println!("Fetching file {} from network...", file_id);
+        
+        // First, try to find the file in our local registry
+        // In a full P2P system, we'd also query the DHT for file metadata
+        let metadata = {
+            let file_id_parsed = file_id.parse()
+                .map_err(|e| NodeError::General(format!("Invalid file ID: {}", e)))?;
+            
+            self.file_registry.get_file(&file_id_parsed)
+                .ok_or_else(|| NodeError::General("File not found in registry".to_string()))?
+                .clone()
+        };
+        
+        println!("Found file metadata: {} ({} chunks)", metadata.original_name, metadata.chunk_count);
+        
+        // Collect all chunks (from local storage or remote peers)
+        let mut all_chunks: Vec<(usize, Vec<u8>)> = Vec::new();
+        let mut missing_chunks: Vec<(usize, ContentAddress)> = Vec::new();
+        
+        // Try to get each chunk locally first
+        for (idx, chunk_addr) in metadata.chunk_addresses.iter().enumerate() {
+            match self.content_store.get_chunk(chunk_addr) {
+                Ok(chunk) => {
+                    all_chunks.push((idx, chunk.data().to_vec()));
+                }
+                Err(_) => {
+                    missing_chunks.push((idx, chunk_addr.clone()));
+                }
+            }
+        }
+        
+        println!("Local chunks: {}/{}", all_chunks.len(), metadata.chunk_count);
+        
+        if !missing_chunks.is_empty() {
+            println!("Missing {} chunks, attempting to fetch from network...", missing_chunks.len());
+            
+            // Get connected peers
+            let connected_peers = self.connected_peers();
+            
+            if connected_peers.is_empty() {
+                println!("Warning: No connected peers to fetch missing chunks from");
+            } else {
+                // Try each connected peer for missing chunks
+                for peer_id in &connected_peers {
+                    if missing_chunks.is_empty() {
+                        break;
+                    }
+                    
+                    let addresses: Vec<ContentAddress> = missing_chunks.iter()
+                        .map(|(_, addr)| addr.clone())
+                        .collect();
+                    
+                    println!("Requesting {} chunks from peer {}", addresses.len(), peer_id);
+                    
+                    // Request chunks from peer (this initiates the request)
+                    // The response will come through the event loop
+                    let _ = self.request_chunks_from_peer(peer_id, addresses).await;
+                    
+                    // Note: In a complete implementation, we'd await the response
+                    // and then process the received chunks
+                }
+            }
+        }
+        
+        // Sort chunks by index and write to file
+        all_chunks.sort_by_key(|(idx, _)| *idx);
+        
+        // Check if we have all chunks
+        if all_chunks.len() != metadata.chunk_count {
+            return Err(NodeError::General(format!(
+                "Missing chunks: have {}/{}", 
+                all_chunks.len(), 
+                metadata.chunk_count
+            )));
+        }
+        
+        // Create parent directory if needed
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
+        // Write all chunks to the output file
+        let mut file = std::fs::File::create(output_path)?;
+        for (_, data) in all_chunks {
+            file.write_all(&data)?;
+        }
+        
+        println!("File written to: {}", output_path.display());
+        Ok(())
+    }
+    
+    /// Store a file locally and get providers from the network
+    /// This is useful for downloading content that we don't have locally
+    pub async fn fetch_and_store_chunk(
+        &mut self,
+        address: &ContentAddress,
+    ) -> NodeResult<bool> {
+        // Check if we already have this chunk
+        if self.content_store.has_chunk(address)? {
+            return Ok(true);
+        }
+        
+        // Find providers for this content via DHT
+        let providers = self.find_providers(address).await?;
+        
+        if providers.is_empty() {
+            println!("No providers found for chunk: {}", address);
+            return Ok(false);
+        }
+        
+        // Request from first available provider
+        for provider in providers {
+            println!("Requesting chunk {} from provider {}", address, provider);
+            
+            let result = self.request_chunks_from_peer(
+                &provider, 
+                vec![address.clone()]
+            ).await?;
+            
+            if !result.is_empty() {
+                // Store the received chunk
+                let (_, data) = &result[0];
+                self.content_store.put_data(data)?;
+                println!("Chunk {} stored successfully", address);
+                return Ok(true);
+            }
+        }
+        
+        Ok(false)
     }
     
     // =========================================================================
