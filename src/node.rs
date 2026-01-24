@@ -446,7 +446,7 @@ impl Node {
         
         // Add creation time if we can read it
         if let Ok(metadata) = NodeMetadata::load_from_file(&metadata_file) {
-            let created_at = std::time::UNIX_EPOCH + std::time::Duration::from_secs(metadata.created_at);
+            let _created_at = std::time::UNIX_EPOCH + std::time::Duration::from_secs(metadata.created_at);
             result.push(format!("  Created: {} seconds since epoch", metadata.created_at));
         }
         
