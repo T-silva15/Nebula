@@ -121,7 +121,7 @@ fn handle_start_command(
             
             // Spawn the network event loop in the background
             // Note: We need to take ownership for the spawn, so we use a channel to signal shutdown
-            let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+            let (shutdown_tx, _shutdown_rx) = tokio::sync::oneshot::channel::<()>();
             
             // Run network event loop until Ctrl+C
             tokio::select! {

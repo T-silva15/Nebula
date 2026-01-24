@@ -2,6 +2,8 @@
 //!
 //! Configuration for the Kademlia DHT behaviour.
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

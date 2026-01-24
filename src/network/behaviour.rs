@@ -2,6 +2,8 @@
 //!
 //! Combines all libp2p protocols into a single NetworkBehaviour.
 
+#![allow(dead_code)]
+
 use libp2p::{
     identify,
     kad::{self, store::MemoryStore},

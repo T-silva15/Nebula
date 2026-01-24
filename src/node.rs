@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use uuid::Uuid;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -8,7 +10,7 @@ use crate::config::{NodeState, LogLevel};
 use crate::storage::{ContentStore, ContentStoreConfig, ChunkConfig};
 use crate::content::ContentAddress;
 use crate::file::{FileRegistry, FileMetadata, FileId};
-use crate::network::{NetworkConfig, NetworkSwarm, NetworkEvent, NetworkCommand, ChunkRequest};
+use crate::network::{NetworkConfig, NetworkSwarm, ChunkRequest};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeError {
@@ -605,11 +607,11 @@ impl Node {
     pub async fn announce_content(&mut self, address: &ContentAddress) -> NodeResult<()> {
         use libp2p::kad::RecordKey;
         
-        let swarm = self.network_swarm.as_mut()
+        let _swarm = self.network_swarm.as_mut()
             .ok_or_else(|| NodeError::General("Network not initialized".to_string()))?;
         
         // Convert content address to Kademlia record key
-        let key = RecordKey::new(&address.to_bytes());
+        let _key = RecordKey::new(&address.to_bytes());
         
         println!("Announcing content to DHT: {}", address);
         
@@ -662,7 +664,7 @@ impl Node {
     
     /// Query the DHT for providers of specific content
     pub async fn find_providers(&mut self, address: &ContentAddress) -> NodeResult<Vec<String>> {
-        let swarm = self.network_swarm.as_mut()
+        let _swarm = self.network_swarm.as_mut()
             .ok_or_else(|| NodeError::General("Network not initialized".to_string()))?;
         
         // Note: In a full implementation, this would:

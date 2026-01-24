@@ -2,6 +2,8 @@
 //!
 //! Custom protocol for requesting and transferring content chunks between peers.
 
+#![allow(dead_code)]
+
 use futures::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use libp2p::{
     request_response::{self, Codec, ProtocolSupport},

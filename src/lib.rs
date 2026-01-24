@@ -11,4 +11,5 @@ pub mod network;
 // Re-export commonly used items
 pub use config::{Config, LogLevel, NodeState};
 pub use node::Node;
-pub use network::{NetworkConfig, NetworkSwarm, NetworkEvent};
+pub use network::{NetworkConfig, NetworkSwarm};
+pub use network::swarm::{NetworkEvent, NetworkCommand};

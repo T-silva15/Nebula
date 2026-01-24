@@ -2,6 +2,8 @@
 //!
 //! Configures TCP transport with Noise encryption and Yamux multiplexing.
 
+#![allow(dead_code)]
+
 use libp2p::{
     core::upgrade,
     identity::Keypair,

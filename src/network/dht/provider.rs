@@ -2,6 +2,8 @@
 //!
 //! Manages content provider records and chunk location.
 
+#![allow(dead_code)]
+
 use libp2p::{PeerId, Multiaddr};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};

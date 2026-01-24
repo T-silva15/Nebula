@@ -2,6 +2,8 @@
 //!
 //! Provides mDNS for local network discovery and bootstrap node support.
 
+#![allow(dead_code)]
+
 use libp2p::{
     mdns,
     Multiaddr,

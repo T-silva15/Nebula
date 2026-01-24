@@ -2,6 +2,8 @@
 //!
 //! High-level interface for managing the libp2p swarm and network operations.
 
+#![allow(dead_code)]
+
 use futures::StreamExt;
 use libp2p::{
     identity::Keypair,
@@ -476,7 +478,7 @@ impl NetworkSwarm {
     
     /// Handle Kademlia DHT events
     async fn handle_kademlia_event(
-        swarm: &mut Swarm<NebulaBehaviour>,
+        _swarm: &mut Swarm<NebulaBehaviour>,
         event: kad::Event,
     ) {
         match event {

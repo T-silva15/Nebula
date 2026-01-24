@@ -3,6 +3,8 @@
 //! This module provides peer-to-peer networking capabilities using libp2p,
 //! including peer discovery, connection management, and chunk transfer protocols.
 
+#![allow(dead_code)]
+
 pub mod peer;
 pub mod transport;
 pub mod discovery;
@@ -12,13 +14,8 @@ pub mod swarm;
 pub mod dht;
 
 // Re-export commonly used types
-pub use peer::{PeerId, PeerInfo, PeerState};
-pub use transport::NetworkTransport;
-pub use discovery::DiscoveryConfig;
-pub use protocol::{ChunkProtocol, ChunkRequest, ChunkResponse};
-pub use behaviour::NebulaBehaviour;
-pub use swarm::{NetworkSwarm, NetworkEvent, NetworkConfig, NetworkCommand};
-pub use dht::{DhtConfig, DhtMode, DhtError, ProviderManager};
+pub use protocol::ChunkRequest;
+pub use swarm::{NetworkSwarm, NetworkConfig};
 
 use thiserror::Error;
 

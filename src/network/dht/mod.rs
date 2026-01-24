@@ -11,24 +11,21 @@
 //! - Content location and provider management
 //! - S/Kademlia security extensions
 
+#![allow(dead_code)]
+
 mod config;
 mod routing;
 mod provider;
 mod storage;
 
 pub use config::{DhtConfig, DhtMode};
-pub use routing::{RoutingTable, BucketInfo};
-pub use provider::{ProviderRecord, ProviderManager};
-pub use storage::{DhtStorage, DhtKey, DhtValue};
 
 use libp2p::{
-    kad::{self, store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig, Event as KademliaEvent},
+    kad::{self, store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
     PeerId,
 };
-use std::time::Duration;
 
 use crate::content::ContentAddress;
-use super::NetworkError;
 
 /// Result type for DHT operations
 pub type DhtResult<T> = Result<T, DhtError>;

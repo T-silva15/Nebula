@@ -2,6 +2,8 @@
 //!
 //! Provides types for representing and managing peer identities in the network.
 
+#![allow(dead_code)]
+
 use libp2p::PeerId as Libp2pPeerId;
 use libp2p::identity::{Keypair, PublicKey};
 use serde::{Deserialize, Serialize};

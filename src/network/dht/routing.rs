@@ -2,6 +2,8 @@
 //!
 //! Provides visibility into and management of the DHT routing table.
 
+#![allow(dead_code)]
+
 use libp2p::PeerId;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
